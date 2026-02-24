@@ -1,5 +1,5 @@
 # Utilisation d'une image de base officielle et légère
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Création du répertoire de travail
 WORKDIR /usr/src/app
