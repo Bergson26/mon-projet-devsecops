@@ -1,36 +1,78 @@
-# Projet : Pipeline de Déploiement Sécurisée (DevSecOps Workflow)
+# Pipeline DevSecOps — Shift-Left Security (Node.js + Docker + GitHub Actions)
 
-## Réalisé par : Bergson Jean-Michel
+Pipeline CI/CD qui bloque automatiquement tout déploiement vulnérable.
+Approche Shift-Left : les failles sont détectées avant d'atteindre la production.
 
-### À propos de ce projet
-Ce projet de portfolio illustre la conception et l'administration d'une infrastructure d'intégration et de déploiement continu (CI/CD) intégrant la sécurité de manière proactive (approche Shift-Left). L'architecture mise en place automatise l'audit des environnements de développement pour bloquer toute mise en production vulnérable. 
+---
 
-L'objectif est de démontrer de solides compétences en administration réseau, système et cybersécurité, en préparation d'un cursus Bac+5 dans ces domaines à partir de septembre 2026. Le workflow inclut l'analyse statique du code pour prévenir l'exposition de secrets et les failles logiques (comme l'absence de protection CSRF), couplée à une analyse dynamique de l'environnement d'exécution. 
+## Architecture du pipeline
 
-Le projet démontre une réelle capacité d'administration système à travers le durcissement du système d'exploitation du conteneur (Alpine Linux) et la gestion stricte des versions logicielles (Node.js et npm) pour neutraliser les vulnérabilités publiques (CVE) identifiées par les outils de scan. Le déploiement final et automatisé vers le registre GitHub Container Registry valide la maîtrise de l'administration d'infrastructures modernes et la sécurisation des flux de livraison applicative de bout en bout.
+```mermaid
+graph LR
+    A[👨‍💻 git push] --> B{🔍 Gitleaks<br/>Secret scanning}
+    B -->|Secret détecté ❌| Z[🚫 Déploiement bloqué]
+    B -->|✅ OK| C{🧠 Semgrep<br/>Analyse SAST}
+    C -->|Faille code ❌| Z
+    C -->|✅ OK| D[🐳 Docker Build<br/>Node.js + Alpine]
+    D --> E{🛡️ Trivy<br/>CVE scan image}
+    E -->|CVE Critical ❌| Z
+    E -->|✅ OK| F[📦 Push GHCR<br/>Image sécurisée]
+```
 
-### Architecture Technique
-* Plateforme : GitHub Actions.
-* Cible : Application web (Node.js) conteneurisée avec Docker.
-* Workflow : Commit -> Build -> Security Scan -> Deploy (GHCR).
+---
 
-### Outils de Sécurité Implémentés
-1. Analyse Statique (SAST) : Utilisation de Semgrep pour trouver des failles dans le code source (ex: absence de middleware CSRF).
-2. Secret Scanning : Utilisation de Gitleaks pour empêcher de pousser des mots de passe ou des clés d'API sur GitHub.
-3. Analyse de Conteneurs : Utilisation de Trivy pour scanner les vulnérabilités (CVE) de l'image Docker de base et des paquets internes.
+## Stack
 
-### Démonstration et Captures d'Écran
-Ce dépôt contient plusieurs preuves de concept démontrant le mécanisme de blocage de la pipeline en cas de code vulnérable :
+| Composant | Technologie |
+|---|---|
+| Application | Node.js — application web |
+| Conteneur | Docker (Alpine Linux) |
+| CI/CD | GitHub Actions |
+| Secret scanning | Gitleaks |
+| Analyse statique (SAST) | Semgrep |
+| Scan CVE image | Trivy (CRITICAL/HIGH) |
+| Registre d'images | GitHub Container Registry (GHCR) |
 
-* Étape 1 : Blocage par Gitleaks
-La pipeline a volontairement été bloquée suite à l'introduction d'un faux secret AWS dans le code source. L'outil a empêché le déploiement de ce secret.
+---
 
-* Étape 2 : Blocage par Semgrep
-Une fois le secret retiré, l'analyseur statique a bloqué la compilation en détectant l'absence de protection CSRF dans l'application Node.js. Un patch de sécurité a été appliqué pour ajouter les middlewares requis.
+## Les 4 étapes de blocage — preuves de concept
 
-* Étape 3 : Blocage par Trivy
-Lors de la conteneurisation, le scanner Trivy a identifié des vulnérabilités critiques liées au système d'exploitation Alpine obsolète et au gestionnaire de paquets npm.
+### Étape 1 — Blocage par Gitleaks
 
-* Étape 4 : Déploiement réussi
-Après la remédiation complète (mise à jour vers Node 22 et patch de npm), les quatre étapes de sécurité sont passées au vert, permettant la publication automatisée de l'image Docker sécurisée sur le registre GitHub (GHCR).
+Un faux secret AWS a été introduit intentionnellement dans le code source.
+Gitleaks a détecté la fuite et bloqué le pipeline avant tout push vers le registre.
 
+### Étape 2 — Blocage par Semgrep
+
+Secret retiré. Semgrep a ensuite détecté l'absence de middleware CSRF
+dans l'application Node.js et bloqué la compilation.
+**Fix appliqué :** ajout des middlewares de protection CSRF requis.
+
+### Étape 3 — Blocage par Trivy
+
+Image buildée. Trivy a identifié des CVE critiques sur Alpine Linux
+(version obsolète) et sur npm.
+**Fix appliqué :** migration vers Node.js 22 + mise à jour npm.
+
+### Étape 4 — Déploiement réussi ✅
+
+Après remédiation complète, les 4 étapes sont passées au vert.
+L'image Docker sécurisée a été publiée automatiquement sur GHCR.
+
+---
+
+## Résultats
+
+- 3 failles bloquées avant production (secret, CSRF, CVE Alpine)
+- 0 vulnérabilité CRITICAL/HIGH sur l'image finale
+- Déploiement automatisé vers GHCR après remédiation complète
+- Durée totale de la pipeline : < 3 minutes
+
+---
+
+## Limites
+
+- Pipeline sans étape de tests fonctionnels (Pytest / Jest)
+- Pas de déploiement vers un environnement de préprod
+- Semgrep en mode open-source — couverture partielle des règles
+- Image Alpine : surface d'attaque réduite mais surveillance CVE continue nécessaire
